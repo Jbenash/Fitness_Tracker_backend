@@ -11,7 +11,8 @@ import com.fitness.userservice.repository.userRepository;
 import lombok.AllArgsConstructor;
 
 //instead of using lots of getters and setters we can use builder() from lompok
-// but using model mapper is even simpler and convenient 
+// but using model-mapper is even simpler and convenient 
+
 @Service
 @AllArgsConstructor
 public class userService {
@@ -44,7 +45,12 @@ public class userService {
     }
 
     public UserResponse getUserProfile(String userId) {
-        UserResponse userResponse = new UserResponse();
+
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        UserResponse userResponse = modelMapper.map(user, UserResponse.class);
+
         return userResponse;
 
     }
