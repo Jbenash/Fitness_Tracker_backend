@@ -7,6 +7,9 @@ import com.example.activityservice.dto.ActivityResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -15,13 +18,19 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor //creates constructor for only final and non-null fields
-
+@Slf4j
 public class ActivityService {
 
     private final ActivityRepository repo;
     private final UserValidationService userValidator;
     private final ModelMapper mapper;
+    private final RabbitTemplate rabbitTemplate;
 
+    @Value("${rabbitmq.exchange.name}") //fetching the values from property file
+    private String exchange;
+
+    @Value("${rabbitmq.routing.key}")
+    private String routingKey;
 
     public ActivityResponse trackActivity(ActivityRequest request) {
         boolean isValid = Boolean.TRUE.equals(userValidator.validateUser(request.getUserId())
@@ -38,6 +47,13 @@ public class ActivityService {
 
         ActivityResponse response = mapper.map(savedActivity, ActivityResponse.class); //even though we are redundantly mapping twice  , but for reusability purpose we are going with this method
 
+        //publish to rabbitmq for AI processing
+        try {
+            rabbitTemplate.convertAndSend(exchange, routingKey, response);
+        } catch (AmqpException e) {
+            // Keep API success independent from transient broker failures.
+            log.error("Failed to publish activity {} for user {} to RabbitMQ", savedActivity.getId(), savedActivity.getUserId(), e);
+        }
         return response;
     }
 
