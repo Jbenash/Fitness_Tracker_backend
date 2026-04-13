@@ -51,7 +51,7 @@ public class ActivityService {
         try {
             rabbitTemplate.convertAndSend(exchange, routingKey, response);
         } catch (AmqpException e) {
-            // Keep API success independent from transient broker failures.
+            // Keep API success independent of transient broker failures.
             log.error("Failed to publish activity {} for user {} to RabbitMQ", savedActivity.getId(), savedActivity.getUserId(), e);
         }
         return response;
