@@ -13,7 +13,7 @@ public class ActivityMessageListener {
 
 private final ActivityAiService aiService;
 
-    @RabbitListener(queues = "${rabbitmq.queue.name}")
+    @RabbitListener(queues = "${rabbitmq.queue.name:activity.queue}")
     public void  processActivity(Activity activity){
         //here jacksonMessage will automatically populate the incomming activity message to the activity object
         //you just need to create the function and the relevant parameter that is needed to be populated

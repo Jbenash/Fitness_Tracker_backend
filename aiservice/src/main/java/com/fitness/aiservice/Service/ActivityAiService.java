@@ -57,42 +57,54 @@ private void processAiResponse (Activity activity,String aiResponse){
             List<String> improvements = extractImprovements(analysisJson.path("improvements"));
             List<String> suggestions = extractSuggestions(analysisJson.path("suggestions"));
 
+            log.info("AI analysis for activity {}: {}",
+                    activity != null ? activity.getId() : "unknown",
+                    fullAnalysis.toString().trim());
+            log.info("AI improvements: {}", improvements);
+            log.info("AI suggestions: {}", suggestions);
+
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Error while processing AI response", e);
         }
 
 }
 
     private List<String> extractSuggestions(JsonNode suggestionNode) {
-        List <String> suggestions = new ArrayList<>();
-        if(suggestionNode.isArray()){
-            suggestionNode.forEach(suggestion->{
-                String workout = suggestion.path("workout").asString();
-                String description = suggestion.path("description").asString();
-
-                suggestions.add(String.format("%s %s",workout,description));
-            });
-            return suggestions.isEmpty() ?
-                    Collections.singletonList("No specific suggestions provided") :
-                    suggestions;
-
+        if (suggestionNode == null || !suggestionNode.isArray()) {
+            return Collections.singletonList("No specific suggestions provided");
         }
+
+        List<String> suggestions = new ArrayList<>();
+        for (JsonNode suggestion : suggestionNode) {
+            String workout = suggestion.path("workout").asString();
+            String description = suggestion.path("description").asString();
+
+            suggestions.add(String.format("%s %s", workout, description));
+        }
+
+        if (suggestions.isEmpty()) {
+            return Collections.singletonList("No specific suggestions provided");
+        }
+        return suggestions;
     }
 
     private List<String> extractImprovements(JsonNode improvementNode) {
-        List <String> improvements = new ArrayList<>();
-        if(improvementNode.isArray()){
-            improvementNode.forEach(improvement->{
-                String area = improvement.path("area").asString();
-                String detail = improvement.path("detail").asString();
-
-                improvements.add(String.format("%s %s",area,detail));
-            });
-            return improvements.isEmpty() ?
-                    Collections.singletonList("No specific improvements provided") :
-                    improvements;
-
+        if (improvementNode == null || !improvementNode.isArray()) {
+            return Collections.singletonList("No specific improvements provided");
         }
+
+        List<String> improvements = new ArrayList<>();
+        for (JsonNode improvement : improvementNode) {
+            String area = improvement.path("area").asString();
+            String detail = improvement.path("detail").asString();
+
+            improvements.add(String.format("%s %s", area, detail));
+        }
+
+        if (improvements.isEmpty()) {
+            return Collections.singletonList("No specific improvements provided");
+        }
+        return improvements;
     }
 
     private void addAnalysisSection(StringBuilder fullAnalysis, JsonNode analysisNode, String key, String prefix) {

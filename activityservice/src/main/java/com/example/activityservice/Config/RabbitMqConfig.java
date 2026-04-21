@@ -18,7 +18,7 @@ public class RabbitMqConfig {
     public static final String ACTIVITY_EXCHANGE = "activity.exchange";
     public static final String ACTIVITY_ROUTING_KEY = "activity.routing.key";
 
-    @Value("${rabbitmq.queue.name}")
+    @Value("${rabbitmq.queue.name:activity.queue}")
     private String activityQueueName;
 
     @Bean
