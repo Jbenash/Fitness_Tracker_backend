@@ -1,6 +1,5 @@
-package com.example.activityservice.Service;
+package com.fitness.User;
 
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -13,7 +12,7 @@ import java.time.Duration;
 @Service
 @RequiredArgsConstructor
 @Slf4j // helps to create a log with manually
-public class UserValidationService {
+public class UserService {
 
     //webClient is an asynchronous communication
     private final WebClient userServiceWebClient;

@@ -1,4 +1,4 @@
-package com.example.activityservice.Config;
+package com.fitness.User;
 
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;

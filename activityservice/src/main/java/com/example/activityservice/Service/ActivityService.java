@@ -47,7 +47,7 @@ public class ActivityService {
 
         ActivityResponse response = mapper.map(savedActivity, ActivityResponse.class); //even though we are redundantly mapping twice  , but for reusability purpose we are going with this method
 
-        //publish to rabbitmq for AI processing
+        //publish to rabbitmq for AI processing -rabbitmq is a synchronous communication
         try {
             rabbitTemplate.convertAndSend(exchange, routingKey, response);
         } catch (AmqpException e) {

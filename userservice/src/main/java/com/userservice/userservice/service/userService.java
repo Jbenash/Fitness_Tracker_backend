@@ -27,22 +27,20 @@ public class userService {
 
         // checks for already existing email
         if (userRepo.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already registered");
+            throw new RuntimeException("User already exists");
         }
 
         // map request to user
         User user = modelMapper.map(request, User.class);
 
         // hash the password
-        user.setPassword(encoder.encode(user.getPassword()));
+        user.setPassword(encoder.encode(request.getPassword()));
 
         // save user to the database
         User savedUser = userRepo.save(user);
 
-        // Map entity to response
-        UserResponse userResponse = modelMapper.map(savedUser, UserResponse.class);
-
-        return userResponse;
+        // Map entity and return it as a response
+        return  modelMapper.map(savedUser, UserResponse.class);
 
     }
 
