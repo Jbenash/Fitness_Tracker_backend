@@ -18,6 +18,7 @@ public class UserValidationService {
     //webClient is an asynchronous communication
     private final WebClient userServiceWebClient;
 
+    //we will use Mono where we use synchronous logic -like a promise in js
     public Mono<Boolean> validateUser(String userId) {
         log.info("Validating user with ID: {}", userId);
         return userServiceWebClient.get()

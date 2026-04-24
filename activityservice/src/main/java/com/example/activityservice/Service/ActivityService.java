@@ -10,9 +10,11 @@ import org.modelmapper.ModelMapper;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -58,14 +60,16 @@ public class ActivityService {
     }
 
     public List<ActivityResponse> getAllActivities(String id) {
-
-        List<Activity> activities = repo.findByUserId(id);
-
-        return activities.stream()
-                .map(activity -> mapper.map(activity,ActivityResponse.class))
-                .collect(Collectors.toList());
-
-
+        try {
+            List<Activity> activities = repo.findByUserId(id);
+            return activities.stream()
+                    .map(activity -> mapper.map(activity, ActivityResponse.class))
+                    .collect(Collectors.toList());
+        } catch (DataAccessException ex) {
+            // Degrade to empty list when Mongo is temporarily unavailable.
+            log.error("Failed to fetch activities for user {} due to data access issue", id, ex);
+            return Collections.emptyList();
+        }
     }
 
 
