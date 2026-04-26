@@ -16,8 +16,7 @@ public class recommendationService {
         return repo.findByUserId(userId);
     }
 
-    public recommendations getActivityRecommendations(String activityId) {
-        return repo.findByActivityId(activityId)
-                .orElseThrow(()->new RuntimeException("No recommendation found for : "+ activityId));
+    public java.util.Optional<recommendations> getActivityRecommendations(String activityId) {
+        return repo.findByActivityId(activityId);
     }
 }

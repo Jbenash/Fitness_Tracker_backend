@@ -38,13 +38,10 @@ public class GeminiService {
                 )
         );
 
-        String apiUrl = geminiApiUrl.contains("?")
-                ? geminiApiUrl + "&key=" + geminiApiKey
-                : geminiApiUrl + "?key=" + geminiApiKey;
-
         return webClient.post()
-                .uri(apiUrl)
+                .uri(geminiApiUrl.trim())
                 .header("Content-Type", "application/json")
+                .header("x-goog-api-key", geminiApiKey.trim())
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToMono(String.class)

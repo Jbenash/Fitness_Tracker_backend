@@ -46,8 +46,10 @@ public class userService {
 
     public UserResponse getUserProfile(String userId) {
 
-        User user = userRepo.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        User user = userRepo.findByKeycloakId(userId);
+        if (user == null) {
+            throw new RuntimeException("User not found with Keycloak ID: " + userId);
+        }
 
         UserResponse userResponse = modelMapper.map(user, UserResponse.class);
 
@@ -56,7 +58,7 @@ public class userService {
     }
 
     public Boolean existById(String userId) {
-            log.info("Checking existence of user with ID: {}", userId);
-        return userRepo.existsById(userId);
+            log.info("Checking existence of user with Keycloak ID: {}", userId);
+        return userRepo.existsByKeycloakId(userId);
     }
 }

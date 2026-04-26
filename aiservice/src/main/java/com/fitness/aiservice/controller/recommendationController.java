@@ -1,8 +1,10 @@
 package com.fitness.aiservice.controller;
 
+import com.fitness.aiservice.Service.ActivityAiService;
 import com.fitness.aiservice.Service.recommendationService;
 import com.fitness.aiservice.model.recommendations;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -10,22 +12,62 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/ai")
+@Slf4j
 public class recommendationController {
-    private final recommendationService recommendationService;
+    private final recommendationService service;
+    private final ActivityAiService aiService;
+
+    @GetMapping("/test-gemini")
+    public ResponseEntity<String> testGemini() {
+        try {
+            log.info("MANUAL TEST: Testing Gemini API connection");
+            com.fitness.aiservice.model.Activity dummy = new com.fitness.aiservice.model.Activity();
+            dummy.setType("RUNNING");
+            dummy.setDuration(30);
+            dummy.setCaloriesBurnt(300);
+            dummy.setId("test-123");
+            dummy.setUserId("test-user");
+            
+            String response = aiService.generateRecommendation(dummy);
+            return ResponseEntity.ok("Gemini Connection Successful! Response: " + response);
+        } catch (Exception e) {
+            log.error("Gemini test failed", e);
+            return ResponseEntity.status(500).body("Gemini test failed: " + e.getMessage());
+        }
+    }
 
     @GetMapping("/users/{userId}")
-    public ResponseEntity<List<recommendations>> getUserRecommendations(@PathVariable String userId){
-        return ResponseEntity.ok(recommendationService.getUserRecommendations(userId));
+    public ResponseEntity<?> getUserRecommendations(@PathVariable String userId){
+        try {
+            log.info("Fetching recommendations for user: {}", userId);
+            return ResponseEntity.ok(service.getUserRecommendations(userId));
+        } catch (Exception e) {
+            log.error("Error fetching recommendations for user {}: {}", userId, e.getMessage());
+            return ResponseEntity.status(500).body("Error fetching recommendations: " + e.getMessage());
+        }
     }
 
 
     @GetMapping("/activities/{activityId}")
-    public ResponseEntity<recommendations> getActivityRecommendations(@PathVariable String activityId){
-        return ResponseEntity.ok(recommendationService.getActivityRecommendations(activityId));
+    public ResponseEntity<?> getActivityRecommendations(@PathVariable String activityId){
+        try {
+            log.info("Fetching recommendations for activity: {}", activityId);
+            Optional<recommendations> rec = service.getActivityRecommendations(activityId);
+            if (rec.isPresent()) {
+                return ResponseEntity.ok(rec.get());
+            } else {
+                log.warn("Recommendation not found for activity: {}", activityId);
+                return ResponseEntity.status(404).body("Recommendation not yet generated for this activity.");
+            }
+        } catch (Exception e) {
+            log.error("Error fetching recommendations for activity {}: {}", activityId, e.getMessage());
+            return ResponseEntity.status(500).body("Internal server error: " + e.getMessage());
+        }
     }
 
 

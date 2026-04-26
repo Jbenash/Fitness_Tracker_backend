@@ -1,12 +1,15 @@
 package com.fitness.aiservice.Service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fitness.aiservice.Repository.recommendationRepository;
 import com.fitness.aiservice.model.Activity;
+import com.fitness.aiservice.model.recommendations;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -17,129 +20,100 @@ import java.util.List;
 public class ActivityAiService {
 
     private final GeminiService geminiService;
+    private final recommendationRepository recommendationRepo;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public String generateRecommendation (Activity activity){
+    public String generateRecommendation(Activity activity) {
+        log.info("Generating AI recommendation for activity: {} (Type: {})", activity.getId(), activity.getType());
         String prompt = createPromptForActivity(activity);
-        String aiResponse =  geminiService.getAnswer(prompt);
-        processAiResponse(activity , aiResponse);
-           log.info("Response from Ai {}",aiResponse);
-
-           return aiResponse;
-    }
-private void processAiResponse (Activity activity,String aiResponse){
+        String aiResponse = geminiService.getAnswer(prompt);
+        
+        log.info("Raw Gemini Response for {}: {}", activity.getId(), aiResponse);
+        
         try {
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode  rootNode = mapper.readTree(aiResponse);
-            JsonNode textNode = rootNode.path("candidates")
-                    .get(0)
-                    .path("contents")
-                    .path("parts")
-                    .get(0)
-                    .path("text");
-
-
-            String jsonContent = textNode.asString()
-                            .replaceAll("```json\\n","")
-                            .replaceAll("```\\n","")
-                            .trim();
-            log.info("Parsed response from AI {}" ,jsonContent );
-
-            JsonNode analysisJson = mapper.readTree(jsonContent);
-            JsonNode analysisNode = analysisJson.path("analysis");
-
-            StringBuilder fullAnalysis = new StringBuilder();
-
-            addAnalysisSection(fullAnalysis,analysisNode,"overall","Overall");
-            addAnalysisSection(fullAnalysis,analysisNode,"pace","Pace");
-            addAnalysisSection(fullAnalysis,analysisNode,"heartRate","HeartRate");
-            addAnalysisSection(fullAnalysis,analysisNode,"caloriesBurned","CaloriesBurned");
-
-            List<String> improvements = extractImprovements(analysisJson.path("improvements"));
-            List<String> suggestions = extractSuggestions(analysisJson.path("suggestions"));
-
-            log.info("AI analysis for activity {}: {}",
-                    activity != null ? activity.getId() : "unknown",
-                    fullAnalysis.toString().trim());
-            log.info("AI improvements: {}", improvements);
-            log.info("AI suggestions: {}", suggestions);
-
+            processAiResponse(activity, aiResponse);
+            log.info("Successfully processed and saved AI recommendations for activity: {}", activity.getId());
         } catch (Exception e) {
-            log.error("Error while processing AI response", e);
+            log.error("CRITICAL: Failed to process AI response for activity {}. Error: {}", activity.getId(), e.getMessage());
+            log.error("Full AI Response was: {}", aiResponse);
         }
 
-}
-
-    private List<String> extractSuggestions(JsonNode suggestionNode) {
-        if (suggestionNode == null || !suggestionNode.isArray()) {
-            return Collections.singletonList("No specific suggestions provided");
-        }
-
-        List<String> suggestions = new ArrayList<>();
-        for (JsonNode suggestion : suggestionNode) {
-            String workout = suggestion.path("workout").asString();
-            String description = suggestion.path("description").asString();
-
-            suggestions.add(String.format("%s %s", workout, description));
-        }
-
-        if (suggestions.isEmpty()) {
-            return Collections.singletonList("No specific suggestions provided");
-        }
-        return suggestions;
+        return aiResponse;
     }
 
-    private List<String> extractImprovements(JsonNode improvementNode) {
-        if (improvementNode == null || !improvementNode.isArray()) {
-            return Collections.singletonList("No specific improvements provided");
+    private void processAiResponse(Activity activity, String aiResponse) throws Exception {
+        JsonNode rootNode = objectMapper.readTree(aiResponse);
+        
+        if (rootNode.has("error")) {
+            throw new RuntimeException("AI service returned error: " + rootNode.path("error").asText());
         }
 
-        List<String> improvements = new ArrayList<>();
-        for (JsonNode improvement : improvementNode) {
-            String area = improvement.path("area").asString();
-            String detail = improvement.path("detail").asString();
-
-            improvements.add(String.format("%s %s", area, detail));
+        // Navigate to the actual text content from Gemini's response structure
+        JsonNode candidates = rootNode.path("candidates");
+        if (candidates.isMissingNode() || !candidates.isArray() || candidates.isEmpty()) {
+            throw new RuntimeException("No candidates found in AI response");
         }
 
-        if (improvements.isEmpty()) {
-            return Collections.singletonList("No specific improvements provided");
+        JsonNode textNode = candidates.get(0)
+                .path("content")
+                .path("parts")
+                .get(0)
+                .path("text");
+
+        if (textNode.isMissingNode()) {
+            throw new RuntimeException("AI response text is missing in parts");
         }
-        return improvements;
+
+        String jsonContent = textNode.asText()
+                .replaceAll("(?i)```json", "")
+                .replaceAll("```", "")
+                .trim();
+
+        log.debug("Extracted JSON from AI: {}", jsonContent);
+        JsonNode analysisJson = objectMapper.readTree(jsonContent);
+
+        // Map AI response to our recommendations model
+        recommendations rec = recommendations.builder()
+                .activityId(activity.getId())
+                .userId(activity.getUserId())
+                .activityType(activity.getType() != null ? activity.getType() : "Workout")
+                .recommendationText(analysisJson.path("summary").asText("No summary provided"))
+                .improvements(extractList(analysisJson.path("improvements")))
+                .suggestions(extractList(analysisJson.path("suggestions")))
+                .safety(extractList(analysisJson.path("safety")))
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        // SAVE TO DATABASE
+        recommendationRepo.save(rec);
     }
 
-    private void addAnalysisSection(StringBuilder fullAnalysis, JsonNode analysisNode, String key, String prefix) {
-        if(!analysisNode.path(key).isMissingNode()){
-            fullAnalysis.append(prefix)
-                    .append(analysisNode.path(key).asString())
-                    .append("\n\n");
+    private List<String> extractList(JsonNode node) {
+        if (node == null || !node.isArray()) {
+            return Collections.emptyList();
         }
+        List<String> list = new ArrayList<>();
+        for (JsonNode item : node) {
+            list.add(item.asText());
+        }
+        return list;
     }
 
     private String createPromptForActivity(Activity activity) {
-        if (activity == null) {
-            return "You are a fitness coach assistant. The activity payload is missing. " +
-                    "Return a short message asking for activity details like duration, calories burnt, and intensity.";
-        }
-
-        String duration = activity.getDuration() != null ? activity.getDuration() + " minutes" : "not provided";
-        String calories = activity.getCaloriesBurnt() != null ? activity.getCaloriesBurnt() + " kcal" : "not provided";
-        String additional = activity.getAdditionalMatrice() != null && !activity.getAdditionalMatrice().isEmpty()
-                ? activity.getAdditionalMatrice().toString()
-                : "not provided";
-
-        return "You are an expert fitness coach. Analyze the user's recent activity and provide concise, practical guidance.\n\n" +
-                "Activity details:\n" +
-                "- User ID: " + (activity.getUserId() != null ? activity.getUserId() : "unknown") + "\n" +
-                "- Duration: " + duration + "\n" +
-                "- Calories Burnt: " + calories + "\n" +
-                "- Additional Metrics: " + additional + "\n" +
-                "- Logged At: " + (activity.getCreatedAt() != null ? activity.getCreatedAt() : "unknown") + "\n\n" +
-                "Response format:\n" +
-                "1) One-line activity assessment.\n" +
-                "2) Three actionable recommendations to improve performance.\n" +
-                "3) One safety/recovery suggestion.\n" +
-                "Keep response under 120 words and avoid medical diagnosis.";
+        String type = activity.getType() != null ? activity.getType() : "Workout";
+        return "You are an expert fitness coach. Analyze the user's recent " + type + " activity and provide specific, actionable insights in JSON format.\n\n" +
+                "Activity Details:\n" +
+                "- Type: " + type + "\n" +
+                "- Duration: " + activity.getDuration() + " minutes\n" +
+                "- Calories Burnt: " + activity.getCaloriesBurnt() + " kcal\n" +
+                "- Date: " + activity.getCreatedAt() + "\n\n" +
+                "Return ONLY a JSON object with this exact structure:\n" +
+                "{\n" +
+                "  \"summary\": \"A short 1-sentence assessment of the workout.\",\n" +
+                "  \"improvements\": [\"3 specific bullet points on how to improve next time\"],\n" +
+                "  \"suggestions\": [\"2 workout variations or next-step exercises\"],\n" +
+                "  \"safety\": [\"1 safety or recovery tip based on intensity\"]\n" +
+                "}\n" +
+                "Do not include any text outside the JSON block.";
     }
-
-
 }

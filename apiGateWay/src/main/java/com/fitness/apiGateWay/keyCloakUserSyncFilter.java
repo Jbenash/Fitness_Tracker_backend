@@ -23,18 +23,22 @@ public class keyCloakUserSyncFilter implements WebFilter {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, @NonNull WebFilterChain chain) {
-        String userId = exchange.getRequest().getHeaders().getFirst("X-User-ID");
         String token = exchange.getRequest().getHeaders().getFirst("Authorization");
-        RegisterRequest registerRequest = gerUserDetails(token);
 
-        if(userId != null){
-            String finalUserId = registerRequest.getKeycloakId();
-        }
-        // Case 1: Missing headers - just pass through
-        if (registerRequest.getKeycloakId() == null || token == null) {
-            log.debug("Missing X-User-ID or Authorization headers, continuing without sync");
+        // Skip sync if token is missing (e.g. CORS preflight OPTIONS request or public endpoint)
+        if (token == null || !token.startsWith("Bearer ")) {
             return chain.filter(exchange);
         }
+
+        RegisterRequest registerRequest;
+        try {
+            registerRequest = gerUserDetails(token);
+        } catch (Exception e) {
+            log.error("Failed to parse JWT token: {}", e.getMessage());
+            return chain.filter(exchange);
+        }
+
+        String userId = registerRequest.getKeycloakId();
 
         // Case 2: Headers present - sync user
         return userService.validateUser(registerRequest.getKeycloakId())
