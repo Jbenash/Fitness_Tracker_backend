@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -62,7 +62,11 @@ public class recommendationController {
                 return ResponseEntity.ok(rec.get());
             } else {
                 log.warn("Recommendation not found for activity: {}", activityId);
-                return ResponseEntity.status(404).body("Recommendation not yet generated for this activity.");
+                return ResponseEntity.accepted().body(Map.of(
+                        "activityId", activityId,
+                        "status", "pending",
+                        "message", "Recommendation not yet generated for this activity. Please retry shortly."
+                ));
             }
         } catch (Exception e) {
             log.error("Error fetching recommendations for activity {}: {}", activityId, e.getMessage());

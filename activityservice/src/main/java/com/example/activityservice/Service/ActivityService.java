@@ -4,6 +4,7 @@ import com.example.activityservice.Model.Activity;
 import com.example.activityservice.Repository.ActivityRepository;
 import com.example.activityservice.dto.ActivityRequest;
 import com.example.activityservice.dto.ActivityResponse;
+import com.example.activityservice.dto.ActivityUpdateRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
@@ -11,7 +12,9 @@ import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -77,6 +80,35 @@ public class ActivityService {
      return repo.findById(id)
              .map(activity -> mapper.map(activity,ActivityResponse.class))
              .orElseThrow(()->new RuntimeException("Activity Not found with id: "+ id));
+
+
+    }
+
+    public void deleteActivity(String activityId) {
+        //checks if activity exist first
+        Activity activity = repo.findById(activityId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Activity not found with id: " + activityId
+                ));
+
+        repo.delete(activity);
+    }
+
+    public ActivityResponse updateActivity(String activityId, ActivityUpdateRequest request) {
+        Activity activity = repo.findById(activityId)
+                .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "Activity not found with id: " + activityId
+        ));
+
+        activity.setType(request.getType());
+        activity.setDuration(request.getDuration());
+        activity.setCaloriesBurnt(request.getCaloriesBurnt());
+
+        Activity savedActivity = repo.save(activity);
+
+        return mapper.map(savedActivity, ActivityResponse.class);
 
 
     }

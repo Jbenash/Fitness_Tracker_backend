@@ -25,10 +25,16 @@ public class GeminiService {
     }
 
     public String getAnswer(String question) {
+        log.info("DEBUG: Using API Key starting with: {}", 
+                 (geminiApiKey != null && geminiApiKey.length() > 5) ? geminiApiKey.substring(0, 5) : "NULL/EMPTY");
+        
         if (geminiApiUrl == null || geminiApiUrl.isBlank() || geminiApiKey == null || geminiApiKey.isBlank()) {
             log.warn("Gemini configuration is missing. Set gemini.api.url and gemini.api.key (or GEMINI_API_URL/GEMINI_API_KEY).");
             return "{\"error\":\"Gemini configuration missing\"}";
         }
+
+        // Move the key from the header into the URL as a query parameter
+        String urlWithKey = geminiApiUrl.trim() + "?key=" + geminiApiKey.trim();
 
         Map<String, Object> requestBody = Map.of(
                 "contents", List.of(
@@ -39,9 +45,8 @@ public class GeminiService {
         );
 
         return webClient.post()
-                .uri(geminiApiUrl.trim())
+                .uri(urlWithKey)
                 .header("Content-Type", "application/json")
-                .header("x-goog-api-key", geminiApiKey.trim())
                 .bodyValue(requestBody)
                 .retrieve()
                 .bodyToMono(String.class)
