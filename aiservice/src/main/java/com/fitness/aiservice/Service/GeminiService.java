@@ -25,9 +25,6 @@ public class GeminiService {
     }
 
     public String getAnswer(String question) {
-        log.info("DEBUG: Using API Key starting with: {}", 
-                 (geminiApiKey != null && geminiApiKey.length() > 5) ? geminiApiKey.substring(0, 5) : "NULL/EMPTY");
-        
         if (geminiApiUrl == null || geminiApiUrl.isBlank() || geminiApiKey == null || geminiApiKey.isBlank()) {
             log.warn("Gemini configuration is missing. Set gemini.api.url and gemini.api.key (or GEMINI_API_URL/GEMINI_API_KEY).");
             return "{\"error\":\"Gemini configuration missing\"}";

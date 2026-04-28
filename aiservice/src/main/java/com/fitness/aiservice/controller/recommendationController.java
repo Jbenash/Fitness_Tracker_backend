@@ -1,6 +1,5 @@
 package com.fitness.aiservice.controller;
 
-import com.fitness.aiservice.Service.ActivityAiService;
 import com.fitness.aiservice.Service.recommendationService;
 import com.fitness.aiservice.model.recommendations;
 import lombok.RequiredArgsConstructor;
@@ -20,26 +19,7 @@ import java.util.Optional;
 @Slf4j
 public class recommendationController {
     private final recommendationService service;
-    private final ActivityAiService aiService;
 
-    @GetMapping("/test-gemini")
-    public ResponseEntity<String> testGemini() {
-        try {
-            log.info("MANUAL TEST: Testing Gemini API connection");
-            com.fitness.aiservice.model.Activity dummy = new com.fitness.aiservice.model.Activity();
-            dummy.setType("RUNNING");
-            dummy.setDuration(30);
-            dummy.setCaloriesBurnt(300);
-            dummy.setId("test-123");
-            dummy.setUserId("test-user");
-            
-            String response = aiService.generateRecommendation(dummy);
-            return ResponseEntity.ok("Gemini Connection Successful! Response: " + response);
-        } catch (Exception e) {
-            log.error("Gemini test failed", e);
-            return ResponseEntity.status(500).body("Gemini test failed: " + e.getMessage());
-        }
-    }
 
     @GetMapping("/users/{userId}")
     public ResponseEntity<?> getUserRecommendations(@PathVariable String userId){

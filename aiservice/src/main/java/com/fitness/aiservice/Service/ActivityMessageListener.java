@@ -19,9 +19,8 @@ private final ObjectMapper objectMapper;
 
     @RabbitListener(queues = "${rabbitmq.queue.name:activity.queue}")
     public void processActivity(Map<String, Object> activityPayload){
-        // Consume the JSON payload generically so Rabbit/Jackson type metadata mismatches do not block processing.
         Activity activity = objectMapper.convertValue(activityPayload, Activity.class);
         log.info("Received activity message: {}", activity.getId());
-        log.info("Generated Recommendations {}" ,aiService.generateRecommendation(activity));
+        aiService.generateRecommendation(activity);
     }
 }

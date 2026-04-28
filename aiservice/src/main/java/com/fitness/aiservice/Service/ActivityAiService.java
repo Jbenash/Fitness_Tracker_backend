@@ -13,7 +13,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @Slf4j
@@ -27,25 +26,15 @@ public class ActivityAiService {
     public String generateRecommendation(Activity activity) {
         log.info("Generating AI recommendation for activity: {} (Type: {})", activity.getId(), activity.getType());
         String prompt = createPromptForActivity(activity);
-        String aiResponse;
 
         try {
-            aiResponse = geminiService.getAnswer(prompt);
-        } catch (Exception e) {
-            log.error("Gemini request failed for activity {}. Falling back to a deterministic recommendation.", activity.getId(), e);
-            return saveFallbackRecommendation(activity, "Gemini request failed: " + e.getMessage());
-        }
-
-        log.info("Raw Gemini Response for {}: {}", activity.getId(), aiResponse);
-        
-        try {
+            String aiResponse = geminiService.getAnswer(prompt);
             processAiResponse(activity, aiResponse);
             log.info("Successfully processed and saved AI recommendations for activity: {}", activity.getId());
             return aiResponse;
         } catch (Exception e) {
-            log.error("CRITICAL: Failed to process AI response for activity {}. Error: {}", activity.getId(), e.getMessage());
-            log.error("Full AI Response was: {}", aiResponse);
-            return saveFallbackRecommendation(activity, e.getMessage());
+            log.error("Failed to generate or process AI recommendation for activity {}", activity.getId(), e);
+            throw new RuntimeException("Failed to generate recommendation for activity " + activity.getId(), e);
         }
     }
 
@@ -79,7 +68,6 @@ public class ActivityAiService {
                 .replace("```", "")
                 .trim();
 
-        log.debug("Extracted JSON from AI: {}", jsonContent);
         JsonNode analysisJson = objectMapper.readTree(jsonContent);
 
         // Map AI response to our recommendations model
@@ -98,48 +86,6 @@ public class ActivityAiService {
         recommendationRepo.save(rec);
     }
 
-    private String saveFallbackRecommendation(Activity activity, String reason) {
-        recommendations fallback = recommendations.builder()
-                .activityId(activity.getId())
-                .userId(activity.getUserId())
-                .activityType(activity.getType() != null ? activity.getType() : "Workout")
-                .recommendationText(buildFallbackSummary(activity))
-                .improvements(List.of(
-                        "Keep the workout consistent to build momentum.",
-                        "Add a short warm-up before starting the session.",
-                        "Review intensity and progress gradually next time."
-                ))
-                .suggestions(List.of(
-                        "Try interval training or an extra set for progression.",
-                        "Mix in mobility or recovery work on alternate days."
-                ))
-                .safety(List.of("Stay hydrated and cool down properly after the session."))
-                .createdAt(LocalDateTime.now())
-                .build();
-
-        recommendationRepo.save(fallback);
-        log.info("Saved fallback recommendation for activity {} because: {}", activity.getId(), reason);
-        return toJson(Map.of(
-                "summary", fallback.getRecommendationText(),
-                "improvements", fallback.getImprovements(),
-                "suggestions", fallback.getSuggestions(),
-                "safety", fallback.getSafety(),
-                "fallback", true
-        ));
-    }
-
-    private String buildFallbackSummary(Activity activity) {
-        String type = activity.getType() != null ? activity.getType() : "workout";
-        return "Your " + type.toLowerCase() + " session is recorded. Keep building gradually with better consistency and recovery.";
-    }
-
-    private String toJson(Map<String, Object> payload) {
-        try {
-            return objectMapper.writeValueAsString(payload);
-        } catch (Exception e) {
-            return payload.toString();
-        }
-    }
 
     private List<String> extractList(JsonNode node) {
         if (node == null || !node.isArray()) {
